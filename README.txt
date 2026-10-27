@@ -1,4 +1,4 @@
-Commandes utiles a tout moment
+Commandes utiles à tout moment
 ------------------------------
 docker ps
     Liste les conteneurs en cours d'execution.
