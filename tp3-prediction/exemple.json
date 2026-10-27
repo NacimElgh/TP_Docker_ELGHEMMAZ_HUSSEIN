@@ -1,0 +1,9 @@
+{
+  "client_id": 25,
+  "age": 32,
+  "anciennete": 3,
+  "nombre_commandes": 8,
+  "montant_total": 1250,
+  "montant_moyen": 156.25,
+  "jours_depuis_derniere_commande": 12
+}

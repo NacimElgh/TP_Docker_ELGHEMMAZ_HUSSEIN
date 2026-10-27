@@ -1,0 +1,17 @@
+# Caches Python
+__pycache__/
+*.pyc
+
+# Modele genere a la construction de l image (TP3)
+*.pkl
+
+# Environnements virtuels
+venv/
+.venv/
+
+# Fichiers systeme et editeurs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

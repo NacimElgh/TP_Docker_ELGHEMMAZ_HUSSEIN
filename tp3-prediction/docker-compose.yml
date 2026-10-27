@@ -1,0 +1,62 @@
+# Chaque service devient un conteneur. Compose crée automatiquement un réseau commun
+# où chaque conteneur est joignable par le nom de son service (ex : kafka:9092).
+services:
+  kafka:
+    # Broker Kafka officiel, en mode KRaft (pas besoin de Zookeeper)
+    image: apache/kafka:3.8.0
+    environment:
+      # Identifiant de ce noeud Kafka (un seul noeud ici)
+      KAFKA_NODE_ID: 1
+      # Ce noeud est à la fois broker (stocke les messages) et contrôleur (gère le cluster)
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Ports d'écoute : 9092 pour les clients, 9093 pour le contrôleur
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # Adresse donnée aux microservices : "kafka" est le nom du service sur le réseau Docker
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Un seul broker : pas de réplication possible, donc facteur 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Les consommateurs démarrent sans attendre le rééquilibrage du groupe
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # 6 partitions : jusqu'à 6 instances de prediction peuvent travailler en parallèle
+      KAFKA_NUM_PARTITIONS: 6
+    # Vérifie que Kafka répond ; les autres services attendent qu'il soit "healthy"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  # API REST de commandes (producteur Kafka)
+  commandes:
+    # Image construite à partir de ./commandes/Dockerfile
+    build: ./commandes
+    # Port 8081 de la machine -> port 8080 du conteneur
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      # Demandes de prédiction envoyées par seconde en continu (0 = désactivé)
+      DEBIT_SIMULATION: ${DEBIT:-0}
+      # Affiche les print() immédiatement dans les logs Docker
+      PYTHONUNBUFFERED: "1"
+    # Démarre seulement quand Kafka est prêt
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Service de prédiction ; plusieurs instances possibles avec --scale prediction=K
+  prediction:
+    build: ./prediction
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      # Affiche les print() immédiatement dans les logs Docker
+      PYTHONUNBUFFERED: "1"
+    # Démarre seulement quand Kafka est prêt
+    depends_on:
+      kafka:
+        condition: service_healthy
